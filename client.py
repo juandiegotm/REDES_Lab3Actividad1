@@ -6,7 +6,7 @@ from os.path import isfile, join
 import datetime
 
 HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
+PORT = 25565        # Port to listen on (non-privileged ports are > 1023)
 CHUNK_SIZE = 5 * 1024
 
 PATH_RECIBIDOS = join("recibidos")
