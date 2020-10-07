@@ -3,14 +3,15 @@ import socket
 import threading
 from os import listdir
 from os.path import isfile, join
+from utilities import hash_file
 
 connections = []
 threads = []
 MAX_SIMULTANEOUS_CONNECTIONS = 25
 PATH_ARCHIVOS = "archivos"
 
-CHUNK_SIZE = 5 * 1024
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+CHUNK_SIZE = 5 * 1024 # 5kB
+HOST = ''  # Standard loopback interface address (localhost)
 PORT = 25565        # Port to listen on (non-privileged ports are > 1023)
 
 
@@ -53,23 +54,27 @@ def ejecutar_consola(server):
                 return print("Opción invalida")
             
             rutaArchivo = join(PATH_ARCHIVOS, listaArchivos[indiceArchivo-1])
-           
+
+            hash = hash_file(rutaArchivo) 
            
             print("Indique las IP's a las cuales quieren enviar los archivos (la posición empezando en uno separada por comas):")
             print(list(map(lambda x: x[1][0], connections)))
             print("Si quiere enviarlo a todos, tecleé 'all'")
             destinatarios = input("Opción: ")
 
-
-            # Ejecuta los hilos de las conexiones para empezar a enviar los archivos
+            # Ejecuta los hilos de las conexiones para empezar a enviar los archivos, recibe el mensaje si el servidor recibio completo el archivo y cierra la conexión
             for connection in connections:
-                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo))
+                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hash))
                 threads.append(threadConnection)
                 threadConnection.start()
-            
+
+            for thread in threads:
+                thread.join()
+
             # Quita las conexiones ya cerradas
-            connections.clear()  # Added in Python 3.3
+            connections.clear() 
             del connections[:]
+
 
         elif opcion == 3:
             server.close()
@@ -112,9 +117,9 @@ def ejecutar_servidor(sock):
             connection.close()
 
 
-def enviar_archivo(socket, rutaArchivo):
-
-    socket.sendall(b"ARCHIVO")
+def enviar_archivo(socket, rutaArchivo:str, hash):
+    mensajeArchivo = "ARCHIVO:{}".format(rutaArchivo.split(".")[-1])
+    socket.sendall(mensajeArchivo.encode("utf-8"))
 
     data = socket.recv(1024)
     mensaje = data.decode("utf-8")
@@ -125,9 +130,17 @@ def enviar_archivo(socket, rutaArchivo):
             while data:
                 socket.sendall(data)
                 data = f.read(CHUNK_SIZE)
-        socket.close()
 
+        data = socket.recv(1024)
+        mensaje = data.decode("utf-8")
+        print(mensaje)
 
+        if mensaje == "RECIBIDO":
+            socket.sendall("HASH:{}".format(hash).encode("utf-8"))
+            socket.close()
+        
+        else:
+            print("El archivo no fue recibido")
 
 if __name__ == "__main__":
     main()
