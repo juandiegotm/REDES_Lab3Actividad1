@@ -52,7 +52,7 @@ def ejecutar_consola(server):
                 print("No hay conexiones en este momento.")
                 continue
 
-            logger = Logger(join('logs', datetime.now().strftime("%d-%m-%Y %H-%M-%S")))
+            logger = Logger(join('logs', datetime.now().strftime("%d-%m-%Y %H-%M-%S") + ".txt"))
             logger.log("Inicio de la prueba")
 
             print("De los siguientes archivos, seleccione el que quiere enviar a los clientes.")
