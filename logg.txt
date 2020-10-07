@@ -1,1 +1,1 @@
-2020-10-06 21:25:17.607188sending b'HELLO'calhost port 25565
+2020-10-06 22:15:10.373344Actualmente hay 0 conexiones

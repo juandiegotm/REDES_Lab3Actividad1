@@ -50,15 +50,16 @@ if message == "APROBADO":
          # Notifica al servidor que está listo para la rececpción del archivo
         sock.sendall(b"PREPARADO")
 
-        with open(join(PATH_RECIBIDOS, filename), "wb") as f:    
-            
+        with open(join(PATH_RECIBIDOS, filename), "wb") as f:  
+              
             restante = int(tamanio)
             while restante:
                 chunk = sock.recv(min(restante, CHUNK_SIZE))
                 restante -= len(chunk) 
                 f.write(chunk)
+            end_ts = datetime.now().timestamp()
  
-        sock.sendall(b"RECIBIDO")
+        sock.sendall("RECIBIDO:{}".format(end_ts).encode('utf-8'))
         
         # Recibe el HASH
         data = sock.recv(1024)

@@ -31,11 +31,10 @@ def crear_servidor():
 
     # Bind the socket to the port
     server_address = (HOST, PORT)
-    print('starting up on {} port {}'.format(*server_address))
     sock.bind(server_address)
 
     # Listen for incoming connections
-    sock.listen(1)
+    sock.listen(25)
 
     return sock
 
@@ -43,7 +42,7 @@ def crear_servidor():
 def ejecutar_consola(server):
     while True:
         imprimir_menu_principal()
-        opcion = int(input("Opción: (1-5)"))
+        opcion = int(input("Opción [1-3]: "))
         if opcion == 1:
             print("Actualmente hay {} conexiones".format(len(connections)))
             f = open('logg.txt','wt')
@@ -51,6 +50,10 @@ def ejecutar_consola(server):
             print("Actualmente hay {} conexiones".format(len(connections)))
             f.close()
         elif opcion == 2:
+            if not len(connections):
+                print("No hay conexiones en este momento.")
+                continue
+
             print("De los siguientes archivos, seleccione el que quiere enviar a los clientes.")
             listaArchivos = listdir(PATH_ARCHIVOS)
             print(listaArchivos)
@@ -63,17 +66,17 @@ def ejecutar_consola(server):
 
             hashed = hash_file(rutaArchivo) 
            
-            print("Indique las IP's a las cuales quieren enviar los archivos (la posición empezando en uno separada por comas):")
-            print(list(map(lambda x: x[1][0], connections)))
-            print("Si quiere enviarlo a todos, tecleé 'all'")
-            destinatarios = input("Opción: ")
+            print(len(connections), list(map(lambda x: x[1][0], connections)))
+            opcion_destinatarios = input("A cuantos clientes desea trasmitir el paquete: [Para enviarselo a todos, escriba 'all'] ")
+            limite = len(connections) if opcion_destinatarios == "all" else min(len(connections), max(int(opcion_destinatarios, 0)))
             
-
             # Ejecuta los hilos de las conexiones para empezar a enviar los archivos, recibe el mensaje si el servidor recibio completo el archivo y cierra la conexión
-            for connection in connections:
+            for i in range(limite):
+                connection = connections[i]
                 threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hashed))
                 threads.append(threadConnection)
                 threadConnection.start()
+
 
             for thread in threads:
                 thread.join()
@@ -91,17 +94,26 @@ def ejecutar_consola(server):
 
 
 def imprimir_menu_principal():
-    print("""Bienvenido a la consola de ejecución del servidor: 
-    Selecciones alguna de la siguientes opciones:
-        1. Ver la cantidad de clientes conectados
-        2. Enviar archivo a clientes
-        3. Salir
+    print("""
+*****************************************************
+*****************************************************
+
+Bienvenido a la consola de ejecución del servidor: 
+Seleccion alguna de la siguientes opciones:
+
+    1. Ver la cantidad de clientes conectados
+    2. Enviar archivo a clientes
+    3. Salir
+
+******************************************************   
+******************************************************
+
     """)
 
 def ejecutar_servidor(sock):
     while True:
         # Wait for a connection
-        print('waiting for a connection')
+        #print('waiting for a connection')
         connection, client_address = sock.accept()
         try:
             print('connection from', client_address)
@@ -111,12 +123,9 @@ def ejecutar_servidor(sock):
             mensaje = data.decode("utf-8")
 
             if mensaje == "HELLO":
-                if len(connections) > 25:
-                    connection.sendall(b"RECHAZADO")
+                connections.append((connection, client_address))
+                connection.sendall(b"APROBADO")
 
-                else:
-                    connections.append((connection, client_address))
-                    connection.sendall(b"APROBADO")
             else:
                 connection.sendall(b"RECHAZADO")
             
@@ -135,6 +144,7 @@ def enviar_archivo(socket, rutaArchivo:str, hash):
     if mensaje == "PREPARADO": 
         with open(rutaArchivo, 'rb') as f:
             data = f.read(CHUNK_SIZE)
+            start_ts = datetime.now().timestamp()
             while data:
                 socket.sendall(data)
                 data = f.read(CHUNK_SIZE)
@@ -143,10 +153,16 @@ def enviar_archivo(socket, rutaArchivo:str, hash):
 
         #Espera a recibir la confirmación de terminar
         data = socket.recv(1024)
-        mensaje = data.decode("utf-8")
+        message = data.decode("utf-8")
         
 
-        if mensaje == "RECIBIDO":
+        if message.startswith("RECIBIDO"):
+            end_ts = float(message.split(":")[-1])
+
+            final_time = (end_ts-start_ts)/1000
+            print(start_ts, end_ts)
+            print("Archivo enviado en {:0.9f} segundos".format(final_time))
+
             socket.sendall("HASH:{}".format(hash).encode("utf-8"))
             socket.close()
         
