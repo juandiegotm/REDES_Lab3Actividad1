@@ -77,13 +77,11 @@ def ejecutar_consola(server):
                 threads.append(threadConnection)
                 threadConnection.start()
 
-
             for thread in threads:
                 thread.join()
 
             # Quita las conexiones ya cerradas
-            connections.clear() 
-            del connections[:]
+            del connections[:limite]
 
 
         elif opcion == 3:
