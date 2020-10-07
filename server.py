@@ -1,18 +1,20 @@
 import sys
 import socket
 import threading
-from os import listdir
+from os import listdir, stat
 from os.path import isfile, join
 from utilities import hash_file
+from datetime import datetime
 
 connections = []
 threads = []
 MAX_SIMULTANEOUS_CONNECTIONS = 25
 PATH_ARCHIVOS = "archivos"
 
-CHUNK_SIZE = 5 * 1024 # 5kB
+CHUNK_SIZE = 100 * 1024 # 5kB
 HOST = ''  # Standard loopback interface address (localhost)
 PORT = 25565        # Port to listen on (non-privileged ports are > 1023)
+now = datetime.now()
 
 
 def main():
@@ -44,6 +46,10 @@ def ejecutar_consola(server):
         opcion = int(input("Opción: (1-5)"))
         if opcion == 1:
             print("Actualmente hay {} conexiones".format(len(connections)))
+            f = open('logg.txt','wt')
+            f.write(str(now) + "Actualmente hay {} conexiones".format(len(connections)))
+            print("Actualmente hay {} conexiones".format(len(connections)))
+            f.close()
         elif opcion == 2:
             print("De los siguientes archivos, seleccione el que quiere enviar a los clientes.")
             listaArchivos = listdir(PATH_ARCHIVOS)
@@ -55,16 +61,17 @@ def ejecutar_consola(server):
             
             rutaArchivo = join(PATH_ARCHIVOS, listaArchivos[indiceArchivo-1])
 
-            hash = hash_file(rutaArchivo) 
+            hashed = hash_file(rutaArchivo) 
            
             print("Indique las IP's a las cuales quieren enviar los archivos (la posición empezando en uno separada por comas):")
             print(list(map(lambda x: x[1][0], connections)))
             print("Si quiere enviarlo a todos, tecleé 'all'")
             destinatarios = input("Opción: ")
+            
 
             # Ejecuta los hilos de las conexiones para empezar a enviar los archivos, recibe el mensaje si el servidor recibio completo el archivo y cierra la conexión
             for connection in connections:
-                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hash))
+                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hashed))
                 threads.append(threadConnection)
                 threadConnection.start()
 
@@ -118,7 +125,8 @@ def ejecutar_servidor(sock):
 
 
 def enviar_archivo(socket, rutaArchivo:str, hash):
-    mensajeArchivo = "ARCHIVO:{}".format(rutaArchivo.split(".")[-1])
+    filesize = stat(rutaArchivo).st_size
+    mensajeArchivo = "ARCHIVO:{0}:{1}".format(rutaArchivo.split(".")[-1], filesize)
     socket.sendall(mensajeArchivo.encode("utf-8"))
 
     data = socket.recv(1024)
@@ -131,9 +139,12 @@ def enviar_archivo(socket, rutaArchivo:str, hash):
                 socket.sendall(data)
                 data = f.read(CHUNK_SIZE)
 
+        print("Archivo enviado")
+
+        #Espera a recibir la confirmación de terminar
         data = socket.recv(1024)
         mensaje = data.decode("utf-8")
-        print(mensaje)
+        
 
         if mensaje == "RECIBIDO":
             socket.sendall("HASH:{}".format(hash).encode("utf-8"))
