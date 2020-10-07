@@ -4,7 +4,8 @@ import threading
 from os import listdir, stat
 from os.path import isfile, join
 from utilities import hash_file
-from datetime import datetime
+from datetime import datetime, date
+from logger import Logger
 
 connections = []
 threads = []
@@ -45,14 +46,14 @@ def ejecutar_consola(server):
         opcion = int(input("Opción [1-3]: "))
         if opcion == 1:
             print("Actualmente hay {} conexiones".format(len(connections)))
-            f = open('logg.txt','wt')
-            f.write(str(now) + "Actualmente hay {} conexiones".format(len(connections)))
-            print("Actualmente hay {} conexiones".format(len(connections)))
-            f.close()
+
         elif opcion == 2:
             if not len(connections):
                 print("No hay conexiones en este momento.")
                 continue
+
+            logger = Logger(join('logs', datetime.now().strftime("%d-%m-%Y %H-%M-%S")))
+            logger.log("Inicio de la prueba")
 
             print("De los siguientes archivos, seleccione el que quiere enviar a los clientes.")
             listaArchivos = listdir(PATH_ARCHIVOS)
@@ -65,23 +66,29 @@ def ejecutar_consola(server):
             rutaArchivo = join(PATH_ARCHIVOS, listaArchivos[indiceArchivo-1])
 
             hashed = hash_file(rutaArchivo) 
-           
+            filesize = stat(rutaArchivo).st_size
+
             print(len(connections), list(map(lambda x: x[1][0], connections)))
             opcion_destinatarios = input("A cuantos clientes desea trasmitir el paquete: [Para enviarselo a todos, escriba 'all'] ")
-            limite = len(connections) if opcion_destinatarios == "all" else min(len(connections), max(int(opcion_destinatarios, 0)))
-            
+            limite = len(connections) if opcion_destinatarios == "all" else min(len(connections), max(int(opcion_destinatarios), 0))
+
+            logger.log("Archivo: {} Peso: {} bytes".format(listaArchivos[indiceArchivo-1],filesize))
             # Ejecuta los hilos de las conexiones para empezar a enviar los archivos, recibe el mensaje si el servidor recibio completo el archivo y cierra la conexión
             for i in range(limite):
                 connection = connections[i]
-                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hashed))
+                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hashed, filesize))
                 threads.append(threadConnection)
                 threadConnection.start()
 
+            # Espera a que terminen todos los envios de archivos
             for thread in threads:
                 thread.join()
 
             # Quita las conexiones ya cerradas
             del connections[:limite]
+
+            #Cierra el logger
+            logger.close()
 
 
         elif opcion == 3:
@@ -114,7 +121,7 @@ def ejecutar_servidor(sock):
         #print('waiting for a connection')
         connection, client_address = sock.accept()
         try:
-            print('connection from', client_address)
+            #print('connection from', client_address)
 
             # Receive the data in small chunks
             data = connection.recv(1024)
@@ -131,8 +138,7 @@ def ejecutar_servidor(sock):
             connection.close()
 
 
-def enviar_archivo(socket, rutaArchivo:str, hash):
-    filesize = stat(rutaArchivo).st_size
+def enviar_archivo(socket, rutaArchivo:str, hash, filesize):
     mensajeArchivo = "ARCHIVO:{0}:{1}".format(rutaArchivo.split(".")[-1], filesize)
     socket.sendall(mensajeArchivo.encode("utf-8"))
 
