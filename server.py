@@ -6,6 +6,7 @@ from os.path import isfile, join
 from utilities import hash_file
 from datetime import datetime, date
 from logger import Logger
+import queue
 
 connections = []
 threads = []
@@ -68,15 +69,21 @@ def ejecutar_consola(server):
             hashed = hash_file(rutaArchivo) 
             filesize = stat(rutaArchivo).st_size
 
-            print(len(connections), list(map(lambda x: x[1][0], connections)))
+            clientes = list(map(lambda x: x[1][0], connections))
+            print(clientes)
             opcion_destinatarios = input("A cuantos clientes desea trasmitir el paquete: [Para enviarselo a todos, escriba 'all'] ")
             limite = len(connections) if opcion_destinatarios == "all" else min(len(connections), max(int(opcion_destinatarios), 0))
 
+            # Hace un log del archivo y crea una cola para guardar el resultado de las operaciones de los threads
             logger.log("Archivo: {} Peso: {} bytes".format(listaArchivos[indiceArchivo-1],filesize))
+            logger.log("Cantidad de clientes: {0} Clientes: {1} ".format(len(clientes),clientes))
+            logger.log("Inicio de la trasmision")
+            q = queue.Queue()
+            
             # Ejecuta los hilos de las conexiones para empezar a enviar los archivos, recibe el mensaje si el servidor recibio completo el archivo y cierra la conexión
             for i in range(limite):
                 connection = connections[i]
-                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], rutaArchivo, hashed, filesize))
+                threadConnection = threading.Thread(target=enviar_archivo, args=(connection[0], connection[1], rutaArchivo, hashed, filesize, q))
                 threads.append(threadConnection)
                 threadConnection.start()
 
@@ -87,7 +94,15 @@ def ejecutar_consola(server):
             # Quita las conexiones ya cerradas
             del connections[:limite]
 
+            # Loggea la información contenida en los threads
+            for logInfo in q.queue:
+                logger.log("")
+                for key in logInfo:
+                    logger.log("{0}:{1}".format(key, logInfo[key]))
+            logger.log("")
+
             #Cierra el logger
+            logger.log("Fin de la prueba")
             logger.close()
 
 
@@ -96,6 +111,48 @@ def ejecutar_consola(server):
             break
         else:
             print("Vuelva a intentarlo.")
+
+
+def enviar_archivo(socket, ip, rutaArchivo:str, hash, filesize, q:queue.Queue):
+    # Agrega el objeto que se va a usar para hacer el log
+    log_object = { "Cliente": ip}
+    q.put(log_object)
+
+    mensajeArchivo = "ARCHIVO:{0}:{1}".format(rutaArchivo.split(".")[-1], filesize)
+    socket.sendall(mensajeArchivo.encode("utf-8"))
+
+    data = socket.recv(1024)
+    mensaje = data.decode("utf-8")
+
+    if mensaje == "PREPARADO": 
+        log_object["Entregado"] = "No" 
+
+        with open(rutaArchivo, 'rb') as f:
+            data = f.read(CHUNK_SIZE)
+            start_ts = datetime.now().timestamp()
+            while data:
+                socket.sendall(data)
+                data = f.read(CHUNK_SIZE)
+
+        #Espera a recibir la confirmación de terminar
+        data = socket.recv(1024)
+        message = data.decode("utf-8")
+
+        if message.startswith("RECIBIDO"):
+            log_object["Entregado"] = "Si" 
+
+            end_ts = float(message.split(":")[-1])
+
+            final_time = (end_ts-start_ts)/1000
+
+            socket.sendall("HASH:{}".format(hash).encode("utf-8"))
+            socket.close()
+
+            log_object["Tiempo"] = final_time
+        
+        else:
+            print("El archivo no fue recibido")
+
 
 
 def imprimir_menu_principal():
@@ -137,41 +194,6 @@ def ejecutar_servidor(sock):
         except:
             connection.close()
 
-
-def enviar_archivo(socket, rutaArchivo:str, hash, filesize):
-    mensajeArchivo = "ARCHIVO:{0}:{1}".format(rutaArchivo.split(".")[-1], filesize)
-    socket.sendall(mensajeArchivo.encode("utf-8"))
-
-    data = socket.recv(1024)
-    mensaje = data.decode("utf-8")
-
-    if mensaje == "PREPARADO": 
-        with open(rutaArchivo, 'rb') as f:
-            data = f.read(CHUNK_SIZE)
-            start_ts = datetime.now().timestamp()
-            while data:
-                socket.sendall(data)
-                data = f.read(CHUNK_SIZE)
-
-        print("Archivo enviado")
-
-        #Espera a recibir la confirmación de terminar
-        data = socket.recv(1024)
-        message = data.decode("utf-8")
-        
-
-        if message.startswith("RECIBIDO"):
-            end_ts = float(message.split(":")[-1])
-
-            final_time = (end_ts-start_ts)/1000
-            print(start_ts, end_ts)
-            print("Archivo enviado en {:0.9f} segundos".format(final_time))
-
-            socket.sendall("HASH:{}".format(hash).encode("utf-8"))
-            socket.close()
-        
-        else:
-            print("El archivo no fue recibido")
 
 if __name__ == "__main__":
     main()

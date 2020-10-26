@@ -1,0 +1,10 @@
+[06/10/2020 23:40:40] Inicio de la prueba
+[06/10/2020 23:40:57] Archivo: 100MiB.mp4 Peso: 113866189 bytes
+[06/10/2020 23:40:57] Cantidad de clientes: 1 Clientes: ['127.0.0.1'] 
+[06/10/2020 23:40:57] Inicio de la trasmision
+
+[06/10/2020 23:40:57] Cliente:('127.0.0.1', 53862)
+[06/10/2020 23:40:57] Entregado:Si
+[06/10/2020 23:40:57] Tiempo:0.00044800400733947755
+
+[06/10/2020 23:40:57] Fin de la prueba

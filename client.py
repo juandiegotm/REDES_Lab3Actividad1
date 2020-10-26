@@ -15,22 +15,17 @@ PATH_RECIBIDOS = join("recibidos")
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.settimeout(2000)
 
 # Connect the socket to the port where the server is listening
 server_address = (HOST, PORT)
 sock.connect(server_address)
 
-f = open('logg.txt','wt')
-f.write(str(now) + 'connecting to {} port {}'.format(*server_address))
 print('connecting to {} port {}'.format(*server_address))
 
 # Send data
 message = b'HELLO'
 sock.sendall(message)
 
-f = open('logg.txt','wt')
-f.write(str(now)  +'sending {!r}'.format(message) )
 print('sending {!r}'.format(message))
 
 # Look for the response

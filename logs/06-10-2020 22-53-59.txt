@@ -1,2 +1,0 @@
-[06/10/2020 22:53:59] Inicio de la prueba
-[06/10/2020 22:54:15] Archivo: 100MiB.mp4 Peso: 113866189 bytes
